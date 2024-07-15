@@ -145,3 +145,27 @@
 .env-var-value {
   color: #555;
 }
+.toggle-columns-btn.btn-light {
+  background-color: transparent;
+  border: 1px solid #ccc;
+  color: #666;
+  padding: 5px 10px;
+  font-size: 0.8em;
+}
+
+.toggle-columns-btn.btn-light:hover {
+  background-color: #f0f0f0;
+  color: #333;
+}
+
+
+.breadcrumb {
+  background-color: #f8f9fa;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  border-radius: 0.25rem;
+}
+
+.breadcrumb-item + .breadcrumb-item::before {
+  content: ">";
+}
