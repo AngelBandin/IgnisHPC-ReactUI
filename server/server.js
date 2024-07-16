@@ -1,4 +1,4 @@
-const express = require('express');
+/*const express = require('express');
 const mongoose = require('mongoose');
 
 const app = express();
@@ -30,4 +30,4 @@ mongoose.connect(MONGODB_URI, {
 
 }).catch(err => {
     console.error('Error al conectar a MongoDB:', err);
-});
+});*/

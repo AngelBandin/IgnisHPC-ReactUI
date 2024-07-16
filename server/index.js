@@ -1,5 +1,4 @@
 const cors = require("cors");
-const multer = require("multer");
 const MongoClient = require("mongodb").MongoClient;
 
 let database;
@@ -36,30 +35,26 @@ app.listen(PORT, () => {
             res.status(500).json({ error: "Error interno del servidor" });
         });
 });
-    /*
-app.post('/api/IClusterPrueba/AddCluster',multer().none(),
-    (request,response)=>{
-        database.collection("ICluster").count({},function (error,numOfDocs) {
-            database.collection("ICluster").insertOne({
-                name:"Cluster3",
-                id: parseInt(numOfDocs+1),
-                containers: [{
-                    id: parseInt(numOfDocs+1),
-                    cluster: parseInt(numOfDocs+1),
-                    infoid: 'info4',
-                    host: 'host4',
-                    image: 'image4',
-                    command: 'command4',
-                    resets: parseInt(numOfDocs+1)
-                }]
-            });
-            response.json("Added Succesfully");
-        })
-})
 
-app.delete('/api/IClusterPrueba/DeleteCluster',(request,response)=>{
-    database.collection("ICluster").deleteOne({
-        id:request.query.id
+    app.post('/api/IClusterPrueba/UpdateAllClusters', express.json(), (req, res) => {
+        const newData = req.body;
+
+        if (!Array.isArray(newData)) {
+            return res.status(400).json({ error: "Invalid data format. Expected an array." });
+        }
+
+        database.collection("ICluster").deleteMany({})
+            .then(() => {
+                return database.collection("ICluster").insertMany(newData);
+            })
+            .then(result => {
+                res.json({
+                    message: "Database updated successfully",
+                    insertedCount: result.insertedCount
+                });
+            })
+            .catch(error => {
+                console.error("Error updating database:", error);
+                res.status(500).json({ error: "Error updating database" });
+            });
     });
-    response.json("Delete Successfully")
-})*/

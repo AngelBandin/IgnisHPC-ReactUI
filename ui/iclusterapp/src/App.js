@@ -1,14 +1,10 @@
-import React, { useState, useEffect} from 'react';
-import {Component} from 'react';
-import ReactDOM from "react-dom/client";
-import logo from './favicon.ico';
-import { Route, Routes, Link, useParams, useLocation} from 'react-router-dom';
-// ... other imports
-
 import './App.css';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import { Navbar, Nav, Container } from 'react-bootstrap';
-import Table from 'react-bootstrap/Table';
+import React, {useEffect, useState} from 'react';
+import logo from './favicon.ico';
+import {Link, Route, Routes, useLocation} from 'react-router-dom';
+import {Breadcrumb, Button, Container, Navbar, Table} from 'react-bootstrap';
+//import Table from 'react-bootstrap/Table';
 
 
 const API_URL = "http://localhost:5038/";
@@ -16,7 +12,6 @@ const API_URL = "http://localhost:5038/";
 function App() {
 
     const [clusters, setClusters] = useState([]);
-    const [newClusterName, setNewClusterName] = useState('');
 
     useEffect(() => {
         document.title = "IgnisHPC Web UI";
@@ -29,25 +24,25 @@ function App() {
 
     const fetchData = () => {
         fetch(API_URL + "api/IClusterPrueba/GetCluster")
-            .then(response => response.json())
-            .then(data => updateClusters(data))
+            .then(response=> response.json())
+            .then(data =>updateClusters(data))
             .catch(error => console.error("Error fetching clusters:", error));
     };
 
     const updateClusters = (newData) => {
         setClusters(prevClusters => {
-            // Compara y actualiza solo los datos que han cambiado
-            const updatedClusters = newData.map(newCluster => {
+            if (newData.length === 0) {
+                // If newData is empty, return an empty array to reflect the empty database
+                return [];
+            }
+
+            return newData.map(newCluster => {
                 const existingCluster = prevClusters.find(c => c.id === newCluster.id);
                 if (existingCluster) {
-                    // Realiza una comparación profunda y actualiza solo si es necesario
                     return JSON.stringify(existingCluster) !== JSON.stringify(newCluster) ? newCluster : existingCluster;
                 }
                 return newCluster;
             });
-
-            // Mantén los clusters que aún existen en los datos nuevos
-            return updatedClusters.length > 0 ? updatedClusters : prevClusters;
         });
     };
     return (
@@ -79,7 +74,7 @@ function App() {
     );
 }
 
-import { Breadcrumb } from 'react-bootstrap';
+
 
 function Breadcrumbs() {
     const location = useLocation();
@@ -156,17 +151,14 @@ function GenerateRoutes({jobs}) {
 
 function TaskGroupRoutes( basePath,taskgroup) {
     if (!taskgroup) {
-        console.log("no hay taskgroup " + basePath)
         return null; // Terminate recursion if no dependencies
 
     }
     if (!taskgroup.dependencies || taskgroup.dependencies.length === 0) {
-        console.log("no hay dependencies " + basePath)
         return (
             <Route path={`${basePath}`} element={<TaskView taskgroup={taskgroup} />}/>
         )
     }
-    console.log("todo bien se supone " + basePath)
     return (
         <>
             <Route key = {`${basePath}`} path={`${basePath}`} element={<TaskView taskgroup={taskgroup} />}/>
@@ -446,51 +438,6 @@ function WorkerDetailView({worker}) {
         </div>)
 }
 
-function TaskGroupCluster({cluster}) {
-    const location = useLocation();
-    const currentPath = location.pathname;
-    const lastSlashIndex = currentPath.lastIndexOf('/');
-    const pathtocluster = currentPath.substring(0, lastSlashIndex);
-
-    if (!cluster) {
-        return <div>Este Cluster ya no existe. <Link to="/">Volver a la página principal</Link></div>;
-    }
-    return(
-        <div className="body">
-            <h2 className="cluster-name">{cluster.name} </h2>
-            <h3 className="cluster-name">Details: </h3>
-            <Table striped>
-                <thead>
-                <tr>
-                    <th>Cluster Name</th>
-                    <th>ID</th>
-                    <th>Taskgroup</th>
-                    <th>Containers</th>
-                    <th>Workers</th>
-                    <th>Properties</th>
-                </tr>
-                </thead>
-                <tbody>
-                <tr key={cluster.id}>
-                    <td key={cluster.id}>{cluster.name}</td>
-                    <td key={cluster.id}>{cluster.id}</td>
-
-                    <td key={cluster.id} className="styled-link"><Link
-                        to={`${pathtocluster}/taskgroup`}>taskgroup</Link></td>
-                    <td key={cluster.id} className="styled-link"><Link
-                        to={`${pathtocluster}/containers`}>containers</Link></td>
-                    <td key={cluster.id} className="styled-link">workers</td>
-                    <td key={cluster.id} className="styled-link"><Link
-                        to={`${pathtocluster}/properties`}>properties</Link></td>
-                </tr>
-
-
-                </tbody>
-            </Table>
-            <TaskView taskgroup={cluster.taskgroup}/>
-        </div>)
-}
-
 function TaskView({taskgroup}) {
     const location = useLocation();
     const currentPath = location.pathname;
@@ -535,8 +482,6 @@ function TaskView({taskgroup}) {
         </div>
     );
 }
-
-import {Button} from 'react-bootstrap';
 
 function ContainerClusterView({cluster}) {
     const location = useLocation();
@@ -739,10 +684,6 @@ function ContainerView({containers}) {
 }
 
 function ContainerDetailView({container}) {
-    const location = useLocation();
-    const currentPath = location.pathname;
-    const lastSlashIndex = currentPath.lastIndexOf('/');
-    const pathtoworker = currentPath.substring(0, lastSlashIndex);
     if (!container) {
         return <div>Este Container ya no existe. <Link to="/">Volver a la página principal</Link></div>;
     }
@@ -771,11 +712,11 @@ function StringMapView({variables, string}) {
     );
 }
 
-function safeToString(value) {
+/*function safeToString(value) {
     if (value === null || value === undefined) return 'N/A';
     if (typeof value === 'object') return JSON.stringify(value);
     return String(value);
-}
+}*/
 function VolumeList({volumes}) {
     if (!volumes || volumes.length === 0) {
         return <span>No volumes</span>;
@@ -900,10 +841,6 @@ function PropertiesClusterView({cluster}) {
 }
 
 function PropertiesContainerView({container}) {
-    const location = useLocation();
-    const currentPath = location.pathname;
-    const lastSlashIndex = currentPath.lastIndexOf('/');
-    const pathtoworker = currentPath.substring(0, lastSlashIndex);
     if (!container) {
         return <div>Este Container ya no existe. <Link to="/">Volver a la página principal</Link></div>;
     }
