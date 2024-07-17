@@ -9,8 +9,9 @@ app.use(cors());
 app.use(express.json()); // Use JSON parsing middleware
 
 const PORT = 5038;
-const CONNECTION_STRING = "mongodb://localhost:27017";
+const CONNECTION_STRING = "mongodb://mongodb:27017";
 const DATABASE_NAME = "DB_pruebas";
+//const DATABASE_NAME = "DB_IgnisHPC";
 
 // Conexión a MongoDB y configuración de la ruta para obtener datos
 app.listen(PORT, () => {
@@ -18,12 +19,23 @@ app.listen(PORT, () => {
         .then(client => {
             database = client.db(DATABASE_NAME);
             console.log("Conexión a MongoDB exitosa");
+
+            // Access the collection here after successful connection
+            app.get('/api/IClusterPrueba/GetCluster', (req, res) => {
+                database.collection("ICluster").find({}).toArray()
+                    .then(result => {
+                        res.json(result);
+                    })
+                // ... rest of the handler code
+            });
+            // ... other routes with database access
         })
         .catch(error => {
             console.error("Error al conectar a MongoDB:", error);
         });
     console.log(`Servidor Express escuchando en el puerto ${PORT}`);
 });
+
     app.get('/api/IClusterPrueba/GetCluster', (req, res) => {
     database.collection("ICluster").find({}).toArray()
         .then(result => {
