@@ -7,7 +7,7 @@ import {Breadcrumb, Button, Container, Navbar, Table} from 'react-bootstrap';
 //import Table from 'react-bootstrap/Table';
 
 
-const API_URL = "http://localhost:5038/";
+const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5038/";
 
 function App() {
 

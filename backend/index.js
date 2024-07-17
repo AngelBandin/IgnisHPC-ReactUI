@@ -5,12 +5,15 @@ let database;
 
 const express = require('express');
 const app = express();
-app.use(cors());
+app.use(cors({
+    origin: process.env.FRONTEND_URL || 'http://localhost:3000'
+}));
 app.use(express.json()); // Use JSON parsing middleware
 
-const PORT = 5038;
-const CONNECTION_STRING = "mongodb://mongodb:27017";
-const DATABASE_NAME = "DB_pruebas";
+
+const PORT = process.env.PORT || 5038;
+const CONNECTION_STRING = process.env.MONGODB_URI || "mongodb://localhost:27017";
+const DATABASE_NAME = process.env.DATABASE_NAME || "DB_pruebas";
 //const DATABASE_NAME = "DB_IgnisHPC";
 
 // Conexión a MongoDB y configuración de la ruta para obtener datos
@@ -36,7 +39,7 @@ app.listen(PORT, () => {
     console.log(`Servidor Express escuchando en el puerto ${PORT}`);
 });
 
-    app.get('/api/IClusterPrueba/GetCluster', (req, res) => {
+app.get('/api/IClusterPrueba/GetCluster', (req, res) => {
     database.collection("ICluster").find({}).toArray()
         .then(result => {
             res.json(result);
@@ -48,25 +51,25 @@ app.listen(PORT, () => {
         });
 });
 
-    app.post('/api/IClusterPrueba/UpdateAllClusters', express.json(), (req, res) => {
-        const newData = req.body;
+app.post('/api/IClusterPrueba/UpdateAllClusters', express.json(), (req, res) => {
+    const newData = req.body;
 
-        if (!Array.isArray(newData)) {
-            return res.status(400).json({ error: "Invalid data format. Expected an array." });
-        }
+    if (!Array.isArray(newData)) {
+        return res.status(400).json({ error: "Invalid data format. Expected an array." });
+    }
 
-        database.collection("ICluster").deleteMany({})
-            .then(() => {
-                return database.collection("ICluster").insertMany(newData);
-            })
-            .then(result => {
-                res.json({
-                    message: "Database updated successfully",
-                    insertedCount: result.insertedCount
-                });
-            })
-            .catch(error => {
-                console.error("Error updating database:", error);
-                res.status(500).json({ error: "Error updating database" });
+    database.collection("ICluster").deleteMany({})
+        .then(() => {
+            return database.collection("ICluster").insertMany(newData);
+        })
+        .then(result => {
+            res.json({
+                message: "Database updated successfully",
+                insertedCount: result.insertedCount
             });
-    });
+        })
+        .catch(error => {
+            console.error("Error updating database:", error);
+            res.status(500).json({ error: "Error updating database" });
+        });
+});
