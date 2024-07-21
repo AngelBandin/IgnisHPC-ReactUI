@@ -32,10 +32,10 @@ RUN npm run build
 #FROM node:20-slim
 
 # Install MongoDB
-RUN apt-get update && apt-get install -y wget gnupg
-RUN wget -qO - https://www.mongodb.org/static/pgp/server-6.0.asc | apt-key add -
-RUN echo "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/debian bullseye/mongodb-org/6.0 main" | tee /etc/apt/sources.list.d/mongodb-org-6.0.list
-RUN apt-get update && apt-get install -y mongodb-org
+#RUN apt-get update && apt-get install -y wget gnupg
+#RUN wget -qO - https://www.mongodb.org/static/pgp/server-6.0.asc | apt-key add -
+#RUN echo "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/debian bullseye/mongodb-org/6.0 main" | tee /etc/apt/sources.list.d/mongodb-org-6.0.list
+#RUN apt-get update && apt-get install -y mongodb-org
 
 WORKDIR /app
 
@@ -47,23 +47,17 @@ WORKDIR /app
 
 # Set environment variables
 ENV PORT=5038
+#ip o localhost por defecto
 ENV MONGODB_URI="mongodb://localhost:27017"
 ENV DATABASE_NAME="DB_pruebas"
 
 # Expose ports
-EXPOSE ${PORT} 27017
-
-# Create start script
-RUN echo '#!/bin/bash\n\
-mongod --dbpath /app/data &\n\
-sleep 5\n\
-mongosh '$DATABASE_NAME' --eval "db.createCollection(\"ICluster\")" &\n\
-cd /app/backend && node index.js &\n\
-cd /app/frontend && npx serve -s build -l 3000' > /app/start.sh
-RUN chmod +x /app/start.sh
+EXPOSE ${PORT}  27017
 
 # Set working directory to app root
-WORKDIR /app
-
-# Start all services
-CMD ["/app/start.sh"]
+CMD ["bash", "-c", "echo '#!/bin/bash\n\
+mongod --dbpath /app/data &\n\
+sleep 5\n\
+mongosh '$DATABASE_NAME' --eval \"db.createCollection(\"ICluster\")\" &\n\
+cd /app/backend && node index.js &\n\
+cd /app/frontend && npx serve -s build -l 3000'> /app/start.sh && chmod +x /app/start.sh && /app/start.sh"]
