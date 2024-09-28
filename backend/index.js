@@ -101,7 +101,7 @@ app.post('/api/IClusterPrueba/InsertJob', express.json(), (req, res) => {
 app.post('/api/IClusterPrueba/UpsertCluster', express.json(), (req, res) => {
     const { jobId, cluster } = req.body;
 
-    if (!jobId || !cluster || !cluster.id) {
+    if (!jobId || !cluster || cluster.id == null) {
         return res.status(400).json({ error: "Invalid data. Job ID and cluster with an ID are required." });
     }
 
@@ -158,40 +158,47 @@ app.post('/api/IClusterPrueba/UpsertCluster', express.json(), (req, res) => {
 
 app.post('/api/IClusterPrueba/UpsertWorker', express.json(), (req, res) => {
     const { jobId, clusterId, worker } = req.body;
+    console.log('Received UpsertWorker request:', JSON.stringify(req.body, null, 2));
 
-    if (!jobId || !clusterId || !worker || !worker.id) {
+    if (!jobId || clusterId == null || !worker || worker.id == null) {
         return res.status(400).json({ error: "Invalid data. Job ID, Cluster ID, and worker with an ID are required." });
     }
 
-    database.collection("ICluster").findOne({ id: jobId, "clusters.id": clusterId })
+    database.collection("ICluster").findOne({ id: jobId })
         .then(job => {
             if (!job) {
-                return res.status(404).json({ error: "Job or Cluster not found" });
+                return res.status(404).json({ error: "Job not found" });
             }
 
-            const clusterIndex = job.clusters.findIndex(c => c.id === clusterId);
-            if (clusterIndex === -1) {
+            console.log('Found job:', JSON.stringify(job, null, 2));
+
+            const cluster = job.clusters ? job.clusters.find(c => c.id === clusterId) : null;
+            if (!cluster) {
                 return res.status(404).json({ error: "Cluster not found in the specified job" });
             }
 
-            const existingWorkerIndex = job.clusters[clusterIndex].workers.findIndex(w => w.id === worker.id);
+            const workers = cluster.workers || [];
+            const existingWorkerIndex = workers.findIndex(w => w.id === worker.id);
 
             let updateOperation;
             if (existingWorkerIndex !== -1) {
                 // Update existing worker
                 updateOperation = {
-                    $set: { [`clusters.${clusterIndex}.workers.${existingWorkerIndex}`]: worker }
+                    $set: { [`clusters.$[cluster].workers.${existingWorkerIndex}`]: worker }
                 };
             } else {
                 // Add new worker
                 updateOperation = {
-                    $push: { [`clusters.${clusterIndex}.workers`]: worker }
+                    $push: { "clusters.$[cluster].workers": worker }
                 };
             }
 
             return database.collection("ICluster").updateOne(
-                { id: jobId, "clusters.id": clusterId },
-                updateOperation
+                { id: jobId },
+                updateOperation,
+                {
+                    arrayFilters: [{ "cluster.id": clusterId }]
+                }
             );
         })
         .then(result => {
@@ -203,9 +210,11 @@ app.post('/api/IClusterPrueba/UpsertWorker', express.json(), (req, res) => {
         })
         .catch(error => {
             console.error("Error upserting worker:", error);
-            res.status(500).json({ error: "Error upserting worker" });
+            res.status(500).json({ error: "Error upserting worker", details: error.message, stack: error.stack });
         });
 });
+
+
 /*app.post('/api/IClusterPrueba/UpsertJob', express.json(), (req, res) => {
     const job = req.body;
 
@@ -234,8 +243,7 @@ app.post('/api/IClusterPrueba/UpsertWorker', express.json(), (req, res) => {
 // New endpoint: Destroy Job
 app.post('/api/IClusterPrueba/UpsertContainer', express.json(), async (req, res) => {
     const { jobId, clusterId, container } = req.body;
-
-    if (!jobId || !clusterId || !container || !container.id) {
+    if (!jobId || clusterId == null || !container || container.id == null) {
         return res.status(400).json({ error: "Invalid data. Job ID, Cluster ID, and container with an ID are required." });
     }
 
@@ -308,8 +316,7 @@ app.post('/api/IClusterPrueba/UpsertContainer', express.json(), async (req, res)
 
 app.post('/api/IClusterPrueba/UpsertMultipleContainers', express.json(), async (req, res) => {
     const { jobId, clusterId, containers } = req.body;
-
-    if (!jobId || !clusterId || !Array.isArray(containers) || containers.length === 0) {
+    if (!jobId || clusterId == null|| !Array.isArray(containers) || containers.length === 0) {
         return res.status(400).json({ error: "Invalid data. Job ID, Cluster ID, and an array of containers are required." });
     }
 
@@ -442,7 +449,7 @@ app.delete('/api/IClusterPrueba/DestroyWorker/:jobId/:clusterId/:workerId', (req
 app.delete('/api/IClusterPrueba/DeleteMultipleContainers', express.json(), async (req, res) => {
     const { jobId, clusterId, containerIds } = req.body;
 
-    if (!jobId || !clusterId || !Array.isArray(containerIds) || containerIds.length === 0) {
+    if (!jobId || clusterId== null || !Array.isArray(containerIds) || containerIds.length === 0) {
         return res.status(400).json({ error: "Invalid data. Job ID, Cluster ID, and an array of container IDs are required." });
     }
 

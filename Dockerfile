@@ -48,8 +48,6 @@ WORKDIR /app
 # Set environment variables
 ENV PORT=5038
 #ip o localhost por defecto
-ENV MONGODB_URI="mongodb://localhost:27017"
-ENV DATABASE_NAME="DB_pruebas"
 
 # Expose ports
 EXPOSE ${PORT}  27017
@@ -58,6 +56,6 @@ EXPOSE ${PORT}  27017
 CMD ["bash", "-c", "echo '#!/bin/bash\n\
 mongod --dbpath /app/data &\n\
 sleep 5\n\
-mongosh '$DATABASE_NAME' --eval \"db.createCollection(\"ICluster\")\" &\n\
+mongosh DB_pruebas --eval \"db.createCollection(\"ICluster\")\" &\n\
 cd /app/backend && node index.js &\n\
 cd /app/frontend && npx serve -s build -l 3000'> /app/start.sh && chmod +x /app/start.sh && /app/start.sh"]
