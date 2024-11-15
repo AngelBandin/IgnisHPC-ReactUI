@@ -4,9 +4,9 @@ const MongoClient = require("mongodb").MongoClient;
 let database;
 const express = require('express');
 const app = express();
-const PORT = process.env.PORT || 5038;
+const PORT = 5038;
 const CONNECTION_STRING = `mongodb://localhost:27017`;
-const DATABASE_NAME = process.env.DATABASE_NAME || "DB_pruebas";
+const DATABASE_NAME = "IgnisDB";
 app.use(cors());
 app.use(express.json()); // Use JSON parsing middleware
 
@@ -20,16 +20,6 @@ app.listen(PORT, () => {
         .then(client => {
             database = client.db(DATABASE_NAME);
             console.log("Conexión a MongoDB exitosa");
-
-            // Access the collection here after successful connection
-            app.get('/api/IClusterPrueba/GetCluster', (req, res) => {
-                database.collection("ICluster").find({}).toArray()
-                    .then(result => {
-                        res.json(result);
-                    })
-                // ... rest of the handler code
-            });
-            // ... other routes with database access
         })
         .catch(error => {
             console.error("Error al conectar a MongoDB:", error);
@@ -37,8 +27,8 @@ app.listen(PORT, () => {
     console.log(`Servidor Express escuchando en el puerto ${PORT}`);
 });
 
-app.get('/api/IClusterPrueba/GetCluster', (req, res) => {
-    database.collection("ICluster").find({}).toArray()
+app.get('/api/v1/GetJobs', (req, res) => {
+    database.collection("Jobs").find({}).toArray()
         .then(result => {
             res.json(result);
         })
@@ -49,16 +39,16 @@ app.get('/api/IClusterPrueba/GetCluster', (req, res) => {
         });
 });
 
-app.post('/api/IClusterPrueba/UpdateAllClusters', express.json(), (req, res) => {
+app.post('/api/v1/UpdateAllClusters', (req, res) => {
     const newData = req.body;
 
     if (!Array.isArray(newData)) {
         return res.status(400).json({ error: "Invalid data format. Expected an array." });
     }
 
-    database.collection("ICluster").deleteMany({})
+    database.collection("Jobs").deleteMany({})
         .then(() => {
-            return database.collection("ICluster").insertMany(newData);
+            return database.collection("Jobs").insertMany(newData);
         })
         .then(result => {
             res.json({
@@ -72,20 +62,20 @@ app.post('/api/IClusterPrueba/UpdateAllClusters', express.json(), (req, res) => 
         });
 });
 
-app.post('/api/IClusterPrueba/InsertJob', express.json(), (req, res) => {
+app.post('/api/v1/InsertJob', (req, res) => {
     const job = req.body;
 
     if (!job || !job.id) {
         return res.status(400).json({ error: "Invalid data. Job with an ID is required." });
     }
 
-    database.collection("ICluster").findOne({ id: job.id })
+    database.collection("Jobs").findOne({ id: job.id })
         .then(existingJob => {
             if (existingJob) {
                 return res.status(409).json({ message: "Job with this ID already exists. No action taken." });
             }
 
-            return database.collection("ICluster").insertOne(job);
+            return database.collection("Jobs").insertOne(job);
         })
         .then(result => {
             if (result.insertedId) {
@@ -98,14 +88,57 @@ app.post('/api/IClusterPrueba/InsertJob', express.json(), (req, res) => {
         });
 });
 
-app.post('/api/IClusterPrueba/UpsertCluster', express.json(), (req, res) => {
+app.put('/api/v1/UpdateJob', (req, res) => {
+    const updates = req.body;
+
+    if (!updates || !updates.id) {
+        return res.status(400).json({ error: "Invalid data. Job ID is required." });
+    }
+
+    // Extract id for finding the document
+    const jobId = updates.id;
+
+    database.collection("Jobs").findOne({ id: jobId })
+        .then(existingJob => {
+            if (!existingJob) {
+                return res.status(404).json({ message: "Job not found." });
+            }
+
+            // Merge existing job with updates
+            // This preserves fields that aren't in the update payload
+            const updatedJob = { ...existingJob, ...updates };
+
+            return database.collection("Jobs").updateOne(
+                { id: jobId },
+                { $set: updatedJob }
+            );
+        })
+        .then(result => {
+            if (result?.modifiedCount > 0) {
+                res.json({
+                    message: "Job updated successfully",
+                    modifiedCount: result.modifiedCount
+                });
+            } else if (result?.matchedCount > 0) {
+                res.json({
+                    message: "Job found but no changes were needed",
+                    modifiedCount: 0
+                });
+            }
+        })
+        .catch(error => {
+            console.error("Error updating job:", error);
+            res.status(500).json({ error: "Error updating job" });
+        });
+});
+app.post('/api/v1/UpsertCluster', (req, res) => {
     const { jobId, cluster } = req.body;
 
     if (!jobId || !cluster || cluster.id == null) {
         return res.status(400).json({ error: "Invalid data. Job ID and cluster with an ID are required." });
     }
 
-    database.collection("ICluster").findOne({ id: jobId })
+    database.collection("Jobs").findOne({ id: jobId })
         .then(job => {
             if (!job) {
                 return res.status(404).json({ error: "Job not found" });
@@ -126,7 +159,7 @@ app.post('/api/IClusterPrueba/UpsertCluster', express.json(), (req, res) => {
                 };
             }
 
-            return database.collection("ICluster").updateOne(
+            return database.collection("Jobs").updateOne(
                 { id: jobId },
                 updateOperation
             );
@@ -149,14 +182,14 @@ app.post('/api/IClusterPrueba/UpsertCluster', express.json(), (req, res) => {
                   "jobid": "1",
                   "cluster": {
                     "id": "1",
-                    "name": "ICluster1",
+                    "name": "Jobs1",
                     ... // resto de la información del cluster
                    }
                 }*/
 
 });
 
-app.post('/api/IClusterPrueba/UpsertWorker', express.json(), (req, res) => {
+app.post('/api/v1/UpsertWorker', (req, res) => {
     const { jobId, clusterId, worker } = req.body;
     console.log('Received UpsertWorker request:', JSON.stringify(req.body, null, 2));
 
@@ -164,7 +197,7 @@ app.post('/api/IClusterPrueba/UpsertWorker', express.json(), (req, res) => {
         return res.status(400).json({ error: "Invalid data. Job ID, Cluster ID, and worker with an ID are required." });
     }
 
-    database.collection("ICluster").findOne({ id: jobId })
+    database.collection("Jobs").findOne({ id: jobId })
         .then(job => {
             if (!job) {
                 return res.status(404).json({ error: "Job not found" });
@@ -193,7 +226,7 @@ app.post('/api/IClusterPrueba/UpsertWorker', express.json(), (req, res) => {
                 };
             }
 
-            return database.collection("ICluster").updateOne(
+            return database.collection("Jobs").updateOne(
                 { id: jobId },
                 updateOperation,
                 {
@@ -214,34 +247,7 @@ app.post('/api/IClusterPrueba/UpsertWorker', express.json(), (req, res) => {
         });
 });
 
-
-/*app.post('/api/IClusterPrueba/UpsertJob', express.json(), (req, res) => {
-    const job = req.body;
-
-    if (!job || !job.id) {
-        return res.status(400).json({ error: "Invalid data. Job with an ID is required." });
-    }
-
-    database.collection("ICluster").updateOne(
-        { id: job.id },
-        { $set: job },
-        { upsert: true }
-    )
-        .then(result => {
-            if (result.matchedCount > 0) {
-                res.json({ message: "Job updated successfully" });
-            } else {
-                res.json({ message: "New job inserted successfully" });
-            }
-        })
-        .catch(error => {
-            console.error("Error upserting job:", error);
-            res.status(500).json({ error: "Error upserting job" });
-        });
-});
-*/
-// New endpoint: Destroy Job
-app.post('/api/IClusterPrueba/UpsertContainer', express.json(), async (req, res) => {
+app.post('/api/v1/UpsertContainer', async (req, res) => {
     const { jobId, clusterId, container } = req.body;
     if (!jobId || clusterId == null || !container || container.id == null) {
         return res.status(400).json({ error: "Invalid data. Job ID, Cluster ID, and container with an ID are required." });
@@ -249,7 +255,7 @@ app.post('/api/IClusterPrueba/UpsertContainer', express.json(), async (req, res)
 
     try {
         // First, check if the job and cluster exist
-        const job = await database.collection("ICluster").findOne({ id: jobId, "clusters.id": clusterId });
+        const job = await database.collection("Jobs").findOne({ id: jobId, "clusters.id": clusterId });
 
         if (!job) {
             return res.status(404).json({ error: "Job or Cluster not found" });
@@ -277,7 +283,7 @@ app.post('/api/IClusterPrueba/UpsertContainer', express.json(), async (req, res)
             };
         }
 
-        const result = await database.collection("ICluster").updateOne(
+        const result = await database.collection("Jobs").updateOne(
             { id: jobId, "clusters.id": clusterId },
             updateOperation,
             {
@@ -290,7 +296,7 @@ app.post('/api/IClusterPrueba/UpsertContainer', express.json(), async (req, res)
         }
 
         // Update container in workers
-        await database.collection("ICluster").updateMany(
+        await database.collection("Jobs").updateMany(
             {
                 id: jobId,
                 "clusters.id": clusterId,
@@ -314,83 +320,99 @@ app.post('/api/IClusterPrueba/UpsertContainer', express.json(), async (req, res)
     }
 });
 
-app.post('/api/IClusterPrueba/UpsertMultipleContainers', express.json(), async (req, res) => {
+app.post('/api/v1/UpsertMultipleContainers', async (req, res) => {
     const { jobId, clusterId, containers } = req.body;
-    if (!jobId || clusterId == null|| !Array.isArray(containers) || containers.length === 0) {
+    if (!jobId || clusterId == null || !Array.isArray(containers) || containers.length === 0) {
         return res.status(400).json({ error: "Invalid data. Job ID, Cluster ID, and an array of containers are required." });
     }
 
     try {
         // Check if the job and cluster exist
-        const job = await database.collection("ICluster").findOne({ id: jobId, "clusters.id": clusterId });
+        const job = await database.collection("Jobs").findOne({ id: jobId, "clusters.id": clusterId });
 
         if (!job) {
             return res.status(404).json({ error: "Job or Cluster not found" });
         }
 
         const cluster = job.clusters.find(c => c.id === clusterId);
-
         if (!cluster) {
             return res.status(404).json({ error: "Cluster not found in the specified job" });
         }
 
-        // Prepare the update operation
-        const updateOperation = {
-            $push: {
-                "clusters.$[cluster].containers": {
-                    $each: containers
-                }
-            }
-        };
+        // Get existing containers
+        const existingContainers = cluster.containers || [];
 
-        // Perform the update
-        const result = await database.collection("ICluster").updateOne(
+        // Process each container
+        const updatedContainers = [...existingContainers];
+        const containerUpdates = [];
+
+        for (const newContainer of containers) {
+            const existingIndex = updatedContainers.findIndex(c => c.id === newContainer.id);
+
+            if (existingIndex !== -1) {
+                // Update existing container
+                updatedContainers[existingIndex] = newContainer;
+            } else {
+                // Add new container
+                updatedContainers.push(newContainer);
+            }
+            containerUpdates.push(newContainer);
+        }
+
+        // Update the cluster's containers
+        const result = await database.collection("Jobs").updateOne(
             { id: jobId, "clusters.id": clusterId },
-            updateOperation,
+            {
+                $set: {
+                    "clusters.$[cluster].containers": updatedContainers
+                }
+            },
             {
                 arrayFilters: [{ "cluster.id": clusterId }]
             }
         );
 
-        if (result.modifiedCount === 0) {
-            return res.status(404).json({ error: "Failed to add containers" });
+        if (result.matchedCount === 0) {
+            return res.status(404).json({ error: "Failed to update containers" });
         }
 
-        // Update containers in workers if necessary
-        // This step is optional and depends on your specific requirements
-        for (const container of containers) {
-            await database.collection("ICluster").updateMany(
-                {
-                    id: jobId,
-                    "clusters.id": clusterId,
-                    "clusters.workers.containers.id": container.id
-                },
-                {
-                    $set: { "clusters.$[cluster].workers.$[].containers.$[container]": container }
-                },
-                {
-                    arrayFilters: [
-                        { "cluster.id": clusterId },
-                        { "container.id": container.id }
-                    ]
-                }
-            );
+        // Update containers in workers if they exist
+        if (containerUpdates.length > 0) {
+            for (const container of containerUpdates) {
+                await database.collection("Jobs").updateMany(
+                    {
+                        id: jobId,
+                        "clusters.id": clusterId,
+                        "clusters.workers.containers.id": container.id
+                    },
+                    {
+                        $set: { "clusters.$[cluster].workers.$[].containers.$[container]": container }
+                    },
+                    {
+                        arrayFilters: [
+                            { "cluster.id": clusterId },
+                            { "container.id": container.id }
+                        ]
+                    }
+                );
+            }
         }
 
         res.json({
-            message: "Containers added successfully",
-            addedCount: containers.length
+            message: "Containers updated successfully",
+            updatedCount: containerUpdates.length,
+            totalContainers: updatedContainers.length
         });
     } catch (error) {
-        console.error("Error adding containers:", error);
-        res.status(500).json({ error: "Error adding containers" });
+        console.error("Error updating containers:", error);
+        res.status(500).json({ error: "Error updating containers" });
     }
 });
 
-app.delete('/api/IClusterPrueba/DestroyJob/:jobId', (req, res) => {
+app.delete('/api/v1/DestroyJob/:jobId', (req, res) => {
     const jobId = req.params.jobId;
 
-    database.collection("ICluster").deleteOne({ id: jobId })
+    database.collection("Jobs").deleteOne({ id: jobId })
         .then(result => {
             if (result.deletedCount > 0) {
                 res.json({ message: "Job deleted successfully" });
@@ -405,10 +427,10 @@ app.delete('/api/IClusterPrueba/DestroyJob/:jobId', (req, res) => {
 });
 
 // New endpoint: Destroy Cluster
-app.delete('/api/IClusterPrueba/DestroyCluster/:jobId/:clusterId', (req, res) => {
+app.delete('/api/v1/DestroyCluster/:jobId/:clusterId', (req, res) => {
     const { jobId, clusterId } = req.params;
 
-    database.collection("ICluster").updateOne(
+    database.collection("Jobs").updateOne(
         { id: jobId },
         { $pull: { clusters: { id: clusterId } } }
     )
@@ -426,10 +448,10 @@ app.delete('/api/IClusterPrueba/DestroyCluster/:jobId/:clusterId', (req, res) =>
 });
 
 // New endpoint: Destroy Worker
-app.delete('/api/IClusterPrueba/DestroyWorker/:jobId/:clusterId/:workerId', (req, res) => {
+app.delete('/api/v1/DestroyWorker/:jobId/:clusterId/:workerId', (req, res) => {
     const { jobId, clusterId, workerId } = req.params;
 
-    database.collection("ICluster").updateOne(
+    database.collection("Jobs").updateOne(
         { id: jobId, "clusters.id": clusterId },
         { $pull: { "clusters.$.workers": { id: workerId } } }
     )
@@ -446,7 +468,7 @@ app.delete('/api/IClusterPrueba/DestroyWorker/:jobId/:clusterId/:workerId', (req
         });
 });
 
-app.delete('/api/IClusterPrueba/DeleteMultipleContainers', express.json(), async (req, res) => {
+app.delete('/api/v1/DeleteMultipleContainers', async (req, res) => {
     const { jobId, clusterId, containerIds } = req.body;
 
     if (!jobId || clusterId== null || !Array.isArray(containerIds) || containerIds.length === 0) {
@@ -455,7 +477,7 @@ app.delete('/api/IClusterPrueba/DeleteMultipleContainers', express.json(), async
 
     try {
         // Check if the job and cluster exist
-        const job = await database.collection("ICluster").findOne({ id: jobId, "clusters.id": clusterId });
+        const job = await database.collection("Jobs").findOne({ id: jobId, "clusters.id": clusterId });
 
         if (!job) {
             return res.status(404).json({ error: "Job or Cluster not found" });
@@ -477,7 +499,7 @@ app.delete('/api/IClusterPrueba/DeleteMultipleContainers', express.json(), async
         };
 
         // Perform the update
-        const result = await database.collection("ICluster").updateOne(
+        const result = await database.collection("Jobs").updateOne(
             { id: jobId, "clusters.id": clusterId },
             updateOperation,
             {
@@ -490,7 +512,7 @@ app.delete('/api/IClusterPrueba/DeleteMultipleContainers', express.json(), async
         }
 
         // Remove the deleted containers from workers
-        await database.collection("ICluster").updateMany(
+        await database.collection("Jobs").updateMany(
             { id: jobId, "clusters.id": clusterId },
             {
                 $pull: {
@@ -513,61 +535,3 @@ app.delete('/api/IClusterPrueba/DeleteMultipleContainers', express.json(), async
         res.status(500).json({ error: "Error deleting containers" });
     }
 });
-/*app.post('/api/IClusterPrueba/UpsertJob', express.json(), (req, res) => {
-    const {job} = req.body;
-
-    if (!job|| !job.jobId ) {
-        return res.status(400).json({ error: "Invalid data. Job with an ID is required." });
-    }
-
-    database.collection("ICluster").findOne({ id: job.jobId })
-        .then(job => {
-            if (!job) {
-                return res.status(404).json({ error: "Job not found" });
-            }
-
-            const existingClusterIndex = job.clusters.findIndex(c => c.id === cluster.id);
-
-            let updateOperation;
-            if (existingClusterIndex !== -1) {
-                // Update existing cluster
-                updateOperation = {
-                    $set: { [`clusters.${existingClusterIndex}`]: cluster }
-                };
-            } else {
-                // Add new cluster
-                updateOperation = {
-                    $push: { clusters: cluster }
-                };
-            }
-
-            return database.collection("ICluster").updateOne(
-                { id: jobId },
-                updateOperation
-            );
-        })
-        .then(result => {
-            if (result.matchedCount > 0) {
-                res.json({ message: "Cluster updated or inserted successfully" });
-            } else {
-                res.status(404).json({ error: "Job not found or update failed" });
-            }
-        })
-        .catch(error => {
-            console.error("Error upserting cluster:", error);
-            res.status(500).json({ error: "Error upserting cluster" });
-        });
-
-    //json template
-    ///
-            //   {
-                  //"jobid": "1",
-                  //"cluster": {
-                    //"id": "1",
-                    //"name": "ICluster1",
-                    //... // resto de la información del cluster
-                  // }
-                //}
-
-});*/
-//añadir crear y destruir job y destruir cluster y luego worker.

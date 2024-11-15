@@ -4,14 +4,15 @@ import React, {useEffect, useState} from 'react';
 import logo from './favicon.ico';
 import {Link, Route, Routes, useLocation} from 'react-router-dom';
 import {Breadcrumb, Button, Container, Navbar, Table} from 'react-bootstrap';
-//import Table from 'react-bootstrap/Table';
 
-
-const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5038/";
+const API_PORT = window._env_?.REACT_APP_HOST_PORT || '5038';
+const origin = window.location.origin;
+const baseUrl = origin.substring(0, origin.lastIndexOf(':'));
+const API_URL = process.env.REACT_APP_API_URL || `${baseUrl}:${API_PORT}/`;
 
 function App() {
 
-    const [clusters, setClusters] = useState([]);
+    const [jobs, setJobs] = useState([]);
 
     useEffect(() => {
         document.title = "IgnisHPC Web UI";
@@ -23,25 +24,25 @@ function App() {
     }, []);
 
     const fetchData = () => {
-        fetch(API_URL + "api/IClusterPrueba/GetCluster")
+        fetch(API_URL + "api/v1/GetJobs")
             .then(response=> response.json())
-            .then(data =>updateClusters(data))
-            .catch(error => console.error("Error fetching clusters:", error));
+            .then(data =>updateJobs(data))
+            .catch(error => console.error("Error fetching jobs:", error));
     };
 
-    const updateClusters = (newData) => {
-        setClusters(prevClusters => {
+    const updateJobs = (newData) => {
+        setJobs(prevJobs => {
             if (newData.length === 0) {
-                // If newData is empty, return an empty array to reflect the empty database
+                // si los datos recuperados estan vacios, se devuelve una lista vacia
                 return [];
             }
 
-            return newData.map(newCluster => {
-                const existingCluster = prevClusters.find(c => c.id === newCluster.id);
-                if (existingCluster) {
-                    return JSON.stringify(existingCluster) !== JSON.stringify(newCluster) ? newCluster : existingCluster;
+            return newData.map(newJob => {
+                const existingJob = prevJobs.find(c => c.id === newJob.id);
+                if (existingJob) {
+                    return JSON.stringify(existingJob) !== JSON.stringify(newJob) ? newJob : existingJob;
                 }
-                return newCluster;
+                return newJob;
             });
         });
     };
@@ -51,12 +52,12 @@ function App() {
                 <Container>
                     <Navbar.Brand as={Link} to="/">
                         <img src={logo} className="App-logo" alt="logo" />
-                        IClusterApp
+                        IgnisHPC Web UI
                     </Navbar.Brand>
                 </Container>
             </Navbar>
             <Breadcrumbs/>
-            <GenerateRoutes jobs={clusters}/>
+            <GenerateRoutes jobs={jobs}/>
         </div>
 
     );
@@ -67,6 +68,7 @@ function App() {
 function Breadcrumbs() {
     const location = useLocation();
     const pathnames = location.pathname.split('/').filter((x) => x);
+    const noLinkParts = ['dependencies', 'subtasksgroup']; // parts that should not be clickable
 
     return (
         <Breadcrumb>
@@ -76,7 +78,8 @@ function Breadcrumbs() {
             {pathnames.map((name, index) => {
                 const routeTo = `/${pathnames.slice(0, index + 1).join('/')}`;
                 const isLast = index === pathnames.length - 1;
-                return isLast ? (
+                const isNoLinkPart = noLinkParts.includes(name);
+                return isLast || isNoLinkPart? (
                     <Breadcrumb.Item active key={name}>
                         {name}
                     </Breadcrumb.Item>
@@ -97,36 +100,37 @@ function GenerateRoutes({jobs}) {
             {jobs && jobs.map((job) => (
                 <React.Fragment key={`job-${job.id}`}>
                     {job && <Route path={`/job-${job.id}`} element={<JobDetailView job={job}/>}/>}
+                    {job && <Route path={`/job-${job.id}/driver`} element={<JobDriverView job={job}/>}/>}
                     {job.clusters && job.clusters.map((cluster) => (
-                        <React.Fragment key={`cluster-${cluster.id}`}>
-                            {cluster && <Route path={`/job-${job.id}/cluster-${cluster.id}`} element={<ClusterDetailView cluster={cluster}/>}/>}
+                        <React.Fragment key={`Cluster(${cluster.id})`}>
+                            {cluster && <Route path={`/job-${job.id}/Cluster(${cluster.id})`} element={<ClusterDetailView cluster={cluster}/>}/>}
                             {(() => {
-                                const clusterpath = `/job-${job.id}/cluster-${cluster.id}`;
+                                const clusterpath = `/job-${job.id}/Cluster(${cluster.id})`;
                                 return (
                                     <>
                                         {cluster.containers && <Route path={`${clusterpath}/containers`} element={<ContainerClusterView cluster={cluster}/>} />}
                                         {cluster.properties && <Route path={`${clusterpath}/properties`} element={<PropertiesClusterView cluster={cluster}/>} />}
                                         {cluster.containers && cluster.containers.map((container) => (
                                             <React.Fragment key={`container-${container.id}`}>
-                                                {container && <Route path={`${clusterpath}/containers/container-${container.id}`} element={<ContainerDetailView container={container}/>}/>}
-                                                {container && <Route path={`${clusterpath}/containers/container-${container.id}/properties`} element={<PropertiesContainerView container={container}/>}/>}
+                                                {container && <Route path={`${clusterpath}/containers/Container-(${container.id})`} element={<ContainerDetailView container={container}/>}/>}
+                                                {container && <Route path={`${clusterpath}/containers/Container(${container.id})/properties`} element={<PropertiesContainerView container={container}/>}/>}
                                             </React.Fragment>
                                         ))}
                                         {cluster.taskgroup && TaskGroupRoutes(`${clusterpath}/taskgroup`, cluster.taskgroup)}
                                         {cluster.workers && <Route path={`${clusterpath}/workers`} element={<WorkersView cluster={cluster} />}/>}
                                         {cluster.workers && cluster.workers.map((worker) => (
-                                            <React.Fragment key={`worker-${worker.id}`}>
-                                                {worker && <Route path={`${clusterpath}/workers/worker-${worker.id}`} element={<WorkerDetailView worker={worker}/>}/>}
-                                                {worker.containers && <Route path={`${clusterpath}/workers/worker-${worker.id}/containers`} element={<ContainerWorkerView worker={worker}/>}/>}
-                                                {worker.dataframes && <Route path={`${clusterpath}/workers/worker-${worker.id}/dataframes`} element={<DataframeWorkerView worker={worker}/>}/>}
+                                            <React.Fragment key={`Worker(${worker.id})`}>
+                                                {worker && <Route path={`${clusterpath}/workers/Worker(${worker.id})`} element={<WorkerDetailView worker={worker}/>}/>}
+                                                {worker.containers && <Route path={`${clusterpath}/workers/Worker(${worker.id})/containers`} element={<ContainerWorkerView worker={worker}/>}/>}
+                                                {worker.dataframes && <Route path={`${clusterpath}/workers/Worker(${worker.id})/dataframes`} element={<DataframeWorkerView worker={worker}/>}/>}
 
                                                 {worker.dataframes && worker.dataframes.map((dataframe) => (
-                                                    <React.Fragment key={`datarame-${dataframe.id}`}>
-                                                        {dataframe && <Route path={`${clusterpath}/workers/worker-${worker.id}/dataframes/dataframe-${dataframe.id}`} element={<DataFrameDetailView dataframe={dataframe}/>}/>}
-                                                        {dataframe && dataframe.taskgroup && TaskGroupRoutes(`${clusterpath}/workers/worker-${worker.id}/dataframes/dataframe-${dataframe.id}/taskgroup`, dataframe.taskgroup)}
+                                                    <React.Fragment key={`Dataframe(${dataframe.id})`}>
+                                                        {dataframe && <Route path={`${clusterpath}/workers/Worker(${worker.id})/dataframes/Dataframe(${dataframe.id})`} element={<DataFrameDetailView dataframe={dataframe}/>}/>}
+                                                        {dataframe && dataframe.taskgroup && TaskGroupRoutes(`${clusterpath}/workers/Worker(${worker.id})/dataframes/Dataframe(${dataframe.id})/taskgroup`, dataframe.taskgroup)}
                                                     </React.Fragment>
                                                 ))}
-                                                {worker && worker.taskgroup && TaskGroupRoutes(`${clusterpath}/workers/worker-${worker.id}/taskgroup`, worker.taskgroup)}
+                                                {worker && worker.taskgroup && TaskGroupRoutes(`${clusterpath}/workers/Worker(${worker.id})/taskgroup`, worker.taskgroup)}
                                             </React.Fragment>
                                         ))}
                                     </>
@@ -181,8 +185,10 @@ function JobView({jobs}) {
                         <tr>
                             <th>Job Name</th>
                             <th>ID</th>
+                            <th>Driver</th>
                             <th>Directory</th>
                             <th>Worker</th>
+                            <th>Status</th>
                         </tr>
                         </thead>
                         <tbody>
@@ -192,8 +198,11 @@ function JobView({jobs}) {
                                 <td className="styled-link"><Link
                                     to={`/job-${job.id}`}>{job.name}</Link></td>
                                 <td>{job.id}</td>
-                                <td>{job.directory}</td>
-                                <td>{job.worker}</td>
+                                <td className="styled-link"><Link
+                                    to={`/job-${job.id}/driver`}>driver</Link></td>
+                                <td>{job.directory || "N/A"}</td>
+                                <td>{job.worker || "N/A"}</td>
+                                <td>{job.status|| "Finished"}</td>
                             </tr>
                         ))}
                         </tbody>
@@ -216,18 +225,23 @@ function JobDetailView({job}) {
                 <tr>
                     <th>Job Name</th>
                     <th>ID</th>
+                    <th>Driver</th>
                     <th>Directory</th>
                     <th>Worker</th>
+                    <th>Status</th>
                 </tr>
                 </thead>
                 <tbody>
-                    <tr key={job.id}>
-                        <td className="styled-link"><Link
-                            to={`/job-${job.id}`}>{job.name}</Link></td>
-                        <td>{job.id}</td>
-                        <td>{job.directory}</td>
-                        <td>{job.worker}</td>
-                    </tr>
+                <tr key={job.id}>
+                    <td className="styled-link"><Link
+                        to={`/job-${job.id}`}>{job.name}</Link></td>
+                    <td>{job.id}</td>
+                    <td className="styled-link"><Link
+                        to={`/job-${job.id}/driver`}>driver</Link></td>
+                    <td>{job.directory || "N/A"}</td>
+                    <td>{job.worker || "N/A"}</td>
+                    <td>{job.status || "Finished"}</td>
+                </tr>
                 </tbody>
             </Table>
             <h4 className="cluster-name">Clusters:</h4>
@@ -249,20 +263,57 @@ function JobDetailView({job}) {
                             <td key={cluster.id}>{cluster.name}</td>
                             <td key={cluster.id}>{cluster.id}</td>
 
-                            <td key={cluster.id} className="styled-link">{ <Link
-                                to={`/job-${job.id}/cluster-${cluster.id}/taskgroup`}>taskgroup</Link> || "N/A"} </td>
+                            {cluster.taskgroup ? (<td key={cluster.id} className="styled-link">
+                                <Link to={`/job-${job.id}/Cluster(${cluster.id})/taskgroup`}>taskgroup</Link>
+                            </td>) : <td key={cluster.id}>N/A</td>}
                             <td key={cluster.id} className="styled-link">{<Link
-                                to={`/job-${job.id}/cluster-${cluster.id}/containers`}>containers</Link>||"N/A"}</td>
+                                to={`/job-${job.id}/Cluster(${cluster.id})/containers`}>containers</Link>||"N/A"}</td>
                             <td key={cluster.id} className="styled-link">{<Link
-                                to={`/job-${job.id}/cluster-${cluster.id}/workers`}>workers</Link> || "N/A"}</td>
+                                to={`/job-${job.id}/Cluster(${cluster.id})/workers`}>workers</Link> || "N/A"}</td>
                             <td key={cluster.id} className="styled-link">{<Link
-                                to={`/job-${job.id}/cluster-${cluster.id}/properties`}>properties</Link>|| "N/A"}</td>
+                                to={`/job-${job.id}/Cluster(${cluster.id})/properties`}>properties</Link>|| "N/A"}</td>
                         </tr>
 
                     ))}
                     </tbody>
                 </Table>
             </div>
+        </div>
+    )
+}
+
+function JobDriverView({job}) {
+    if (!job) {
+        return <div>El Driver del trabajo ya no existe. <Link to="/">Volver a la página principal</Link></div>;
+    }
+    return (
+        <div className="body">
+            <h2 className="cluster-name">{job.name}</h2>
+            <h4 className="cluster-name">Details:</h4>
+            <Table striped>
+                <thead>
+                <tr>
+                    <th>Job Name</th>
+                    <th>ID</th>
+                    <th>Driver</th>
+                    <th>Directory</th>
+                    <th>Worker</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr key={job.id}>
+                    <td className="styled-link"><Link
+                        to={`/job-${job.id}`}>{job.name}</Link></td>
+                    <td>{job.id}</td>
+                    <td className="styled-link"><Link
+                        to={`/job-${job.id}/driver`}>driver</Link></td>
+                    <td>{job.directory || "N/A"}</td>
+                    <td>{job.worker || "N/A"}</td>
+                </tr>
+                </tbody>
+            </Table>
+            <h4 className="cluster-name">Driver:</h4>
+            <ContainerView containers={[job.driver]}/>
         </div>
     )
 }
@@ -315,6 +366,7 @@ function WorkersView({cluster}) {
     const lastSlashIndex = currentPath.lastIndexOf('/');
     const pathtocluster = currentPath.substring(0, lastSlashIndex);
     const workers = cluster.workers
+
     if (!cluster) {
         return <div>Este Cluster ya no existe. <Link to="/">Volver a la página principal</Link></div>;
     }
@@ -374,11 +426,11 @@ function WorkersView({cluster}) {
                             <td>{worker.type}</td>
                             <td>{worker.cores}</td>
                             <td key={worker.id} className="styled-link"><Link
-                                to={`${currentPath}/worker-${worker.id}/taskgroup`}>taskgroup</Link></td>
+                                to={`${currentPath}/Worker(${worker.id})/taskgroup`}>taskgroup</Link></td>
                             <td key={worker.id} className="styled-link"><Link
-                                to={`${currentPath}/worker-${worker.id}/containers`}>containers</Link></td>
+                                to={`${currentPath}/Worker(${worker.id})/containers`}>containers</Link></td>
                             <td key={worker.id} className="styled-link"><Link
-                                to={`${currentPath}/worker-${worker.id}/dataframes`}>dataframes</Link></td>
+                                to={`${currentPath}/Worker(${worker.id})/dataframes`}>dataframes</Link></td>
                         </tr>
                     ))}
                     </tbody>
@@ -421,6 +473,7 @@ function WorkerDetailView({worker}) {
                                 to={`${currentPath}/containers`}>containers</Link></td>
                             <td key={worker.id} className="styled-link"><Link
                                 to={`${currentPath}/dataframes`}>dataframes</Link></td>
+
                         </tr>
                     </tbody>
                 </Table>
@@ -459,10 +512,10 @@ function TaskView({taskgroup}) {
                     </tr>
                     </thead>
                     <tbody>
-                    {taskgroup.dependencies && taskgroup.dependencies.map((_, index) => (
+                    {taskgroup.dependencies && taskgroup.dependencies.map((dependency, index) => (
                         <tr key={index}>
                             <td>
-                                <Link to={`${currentPath}/dependencies/taskgroup-${index}`}>taskgroup {index}</Link>
+                                <Link to={`${currentPath}/dependencies/taskgroup-${index}`}>{dependency.tasks[0].name.replace(/.*<--\s*/, "")}</Link>
                             </td>
                         </tr>
                     ))}
@@ -475,10 +528,10 @@ function TaskView({taskgroup}) {
                     </tr>
                     </thead>
                     <tbody>
-                    {taskgroup.subTasksGroup && taskgroup.subTasksGroup.map((_, index) => (
+                    {taskgroup.subTasksGroup && taskgroup.subTasksGroup.map((subtaskgroup, index) => (
                         <tr key={index}>
                             <td>
-                                <Link to={`${currentPath}/subtasksgroup/taskgroup-${index}`}>taskgroup {index}</Link>
+                                <Link to={`${currentPath}/subtasksgroup/taskgroup-${index}`}>{subtaskgroup.tasks[0].name.replace(/.*<--\s*/, "")}</Link>
                             </td>
                         </tr>
                     ))}
@@ -621,6 +674,10 @@ function ContainerView({containers}) {
                                     <Link
                                         to={`${pathtocluster}`}>Cluster</Link>
                                 </td>
+                                {container.clusterId? (<td key={container.clusterId} className="styled-link">
+                                    <Link
+                                        to={`${pathtocluster}`}>Cluster</Link>
+                                </td>) : <td>N/A</td>}
                                 <td>{container.infoid || 'N/A'}</td>
                                 <td className="styled-link">
                                     <Link
@@ -779,25 +836,28 @@ function PortList({ ports }) {
     }
 
     return (
-        <Table striped>
-            <thead>
-            <tr>
-                <th>Container Port</th>
-                <th>Host Port</th>
-                <th>Protocol</th>
-            </tr>
-            </thead>
-            <tbody>
-            {ports.map((port, index) => (
-                <tr key={index}>
-                    <td>{port.containerPort || 'N/A'}</td>
-                    <td>{port.hostPort || 'N/A'}</td>
-                    <td>{port.protocol || 'N/A'}</td>
+        <div style={{ maxHeight: '150px', overflowY: 'auto' }}>
+            <Table striped>
+                <thead>
+                <tr>
+                    <th>Container Port</th>
+                    <th>Host Port</th>
+                    <th>Protocol</th>
                 </tr>
-            ))}
-            </tbody>
-        </Table>
+                </thead>
+                <tbody>
+                {ports.map((port, index) => (
+                    <tr key={index}>
+                        <td>{port.containerPort || 'N/A'}</td>
+                        <td>{port.hostPort || 'N/A'}</td>
+                        <td>{port.protocol || 'N/A'}</td>
+                    </tr>
+                ))}
+                </tbody>
+            </Table>
+        </div>
     );
+
 }
 
 function PropertiesClusterView({cluster}) {
@@ -957,14 +1017,18 @@ function DataFrameDetailView({dataframe}) {
     return(
         <div className="body">
             <h2 className="cluster-name">{dataframe.name}:</h2>
-            <DataFramesView dataframes = {[dataframe]}/>
+            <DataFramesView dataframes = {[dataframe]} detail = {true} />
         </div>)
 }
 
-function DataFramesView({dataframes}) {
+function DataFramesView({dataframes, detail = false}) {
     const location = useLocation();
-    const currentPath = location.pathname;
-    const lastSlashIndex = currentPath.lastIndexOf('/');
+    let currentPath = location.pathname;
+    let lastSlashIndex = currentPath.lastIndexOf('/');
+    if(detail){
+        currentPath = currentPath.substring(0, lastSlashIndex);
+        lastSlashIndex = currentPath.lastIndexOf('/');
+    }
     const pathtoworker = currentPath.substring(0, lastSlashIndex);
 
     return(
@@ -990,7 +1054,7 @@ function DataFramesView({dataframes}) {
                             <td key={dataframe.id} className="styled-link"><Link
                                 to={`${pathtoworker}/containers`}>containers</Link></td>
                             <td key={dataframe.id} className="styled-link"><Link
-                                to={`${currentPath}/dataframe-${dataframe.id}/taskgroup`}>taskgroup</Link></td>
+                                to={`${currentPath}/Dataframe-(${dataframe.id})/taskgroup`}>taskgroup</Link></td>
                         </tr>
                     ))}
                     </tbody>
