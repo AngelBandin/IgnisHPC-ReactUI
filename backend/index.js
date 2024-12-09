@@ -39,7 +39,7 @@ app.get('/api/v1/GetJobs', (req, res) => {
         });
 });
 
-app.post('/api/v1/UpdateAllClusters', (req, res) => {
+app.post('/api/v1/UpdateAllJobs', (req, res) => {
     const newData = req.body;
 
     if (!Array.isArray(newData)) {
@@ -247,78 +247,78 @@ app.post('/api/v1/UpsertWorker', (req, res) => {
         });
 });
 
-app.post('/api/v1/UpsertContainer', async (req, res) => {
-    const { jobId, clusterId, container } = req.body;
-    if (!jobId || clusterId == null || !container || container.id == null) {
-        return res.status(400).json({ error: "Invalid data. Job ID, Cluster ID, and container with an ID are required." });
-    }
-
-    try {
-        // First, check if the job and cluster exist
-        const job = await database.collection("Jobs").findOne({ id: jobId, "clusters.id": clusterId });
-
-        if (!job) {
-            return res.status(404).json({ error: "Job or Cluster not found" });
-        }
-
-        const cluster = job.clusters.find(c => c.id === clusterId);
-
-        if (!cluster) {
-            return res.status(404).json({ error: "Cluster not found in the specified job" });
-        }
-
-        // Check if the container already exists
-        const existingContainerIndex = cluster.containers ? cluster.containers.findIndex(c => c.id === container.id) : -1;
-
-        let updateOperation;
-        if (existingContainerIndex !== -1) {
-            // Update existing container
-            updateOperation = {
-                $set: { [`clusters.$[cluster].containers.${existingContainerIndex}`]: container }
-            };
-        } else {
-            // Add new container
-            updateOperation = {
-                $push: { "clusters.$[cluster].containers": container }
-            };
-        }
-
-        const result = await database.collection("Jobs").updateOne(
-            { id: jobId, "clusters.id": clusterId },
-            updateOperation,
-            {
-                arrayFilters: [{ "cluster.id": clusterId }]
-            }
-        );
-
-        if (result.modifiedCount === 0) {
-            return res.status(404).json({ error: "Failed to update or insert container" });
-        }
-
-        // Update container in workers
-        await database.collection("Jobs").updateMany(
-            {
-                id: jobId,
-                "clusters.id": clusterId,
-                "clusters.workers.containers.id": container.id
-            },
-            {
-                $set: { "clusters.$[cluster].workers.$[].containers.$[container]": container }
-            },
-            {
-                arrayFilters: [
-                    { "cluster.id": clusterId },
-                    { "container.id": container.id }
-                ]
-            }
-        );
-
-        res.json({ message: "Container upserted successfully in cluster and relevant workers" });
-    } catch (error) {
-        console.error("Error upserting container:", error);
-        res.status(500).json({ error: "Error upserting container" });
-    }
-});
+// app.post('/api/v1/UpsertContainer', async (req, res) => {
+//     const { jobId, clusterId, container } = req.body;
+//     if (!jobId || clusterId == null || !container || container.id == null) {
+//         return res.status(400).json({ error: "Invalid data. Job ID, Cluster ID, and container with an ID are required." });
+//     }
+//
+//     try {
+//         // First, check if the job and cluster exist
+//         const job = await database.collection("Jobs").findOne({ id: jobId, "clusters.id": clusterId });
+//
+//         if (!job) {
+//             return res.status(404).json({ error: "Job or Cluster not found" });
+//         }
+//
+//         const cluster = job.clusters.find(c => c.id === clusterId);
+//
+//         if (!cluster) {
+//             return res.status(404).json({ error: "Cluster not found in the specified job" });
+//         }
+//
+//         // Check if the container already exists
+//         const existingContainerIndex = cluster.containers ? cluster.containers.findIndex(c => c.id === container.id) : -1;
+//
+//         let updateOperation;
+//         if (existingContainerIndex !== -1) {
+//             // Update existing container
+//             updateOperation = {
+//                 $set: { [`clusters.$[cluster].containers.${existingContainerIndex}`]: container }
+//             };
+//         } else {
+//             // Add new container
+//             updateOperation = {
+//                 $push: { "clusters.$[cluster].containers": container }
+//             };
+//         }
+//
+//         const result = await database.collection("Jobs").updateOne(
+//             { id: jobId, "clusters.id": clusterId },
+//             updateOperation,
+//             {
+//                 arrayFilters: [{ "cluster.id": clusterId }]
+//             }
+//         );
+//
+//         if (result.modifiedCount === 0) {
+//             return res.status(404).json({ error: "Failed to update or insert container" });
+//         }
+//
+//         // Update container in workers
+//         await database.collection("Jobs").updateMany(
+//             {
+//                 id: jobId,
+//                 "clusters.id": clusterId,
+//                 "clusters.workers.containers.id": container.id
+//             },
+//             {
+//                 $set: { "clusters.$[cluster].workers.$[].containers.$[container]": container }
+//             },
+//             {
+//                 arrayFilters: [
+//                     { "cluster.id": clusterId },
+//                     { "container.id": container.id }
+//                 ]
+//             }
+//         );
+//
+//         res.json({ message: "Container upserted successfully in cluster and relevant workers" });
+//     } catch (error) {
+//         console.error("Error upserting container:", error);
+//         res.status(500).json({ error: "Error upserting container" });
+//     }
+// });
 
 app.post('/api/v1/UpsertMultipleContainers', async (req, res) => {
     const { jobId, clusterId, containers } = req.body;
@@ -409,129 +409,129 @@ app.post('/api/v1/UpsertMultipleContainers', async (req, res) => {
     }
 });
 
-app.delete('/api/v1/DestroyJob/:jobId', (req, res) => {
-    const jobId = req.params.jobId;
-
-    database.collection("Jobs").deleteOne({ id: jobId })
-        .then(result => {
-            if (result.deletedCount > 0) {
-                res.json({ message: "Job deleted successfully" });
-            } else {
-                res.status(404).json({ error: "Job not found" });
-            }
-        })
-        .catch(error => {
-            console.error("Error deleting job:", error);
-            res.status(500).json({ error: "Error deleting job" });
-        });
-});
-
-// New endpoint: Destroy Cluster
-app.delete('/api/v1/DestroyCluster/:jobId/:clusterId', (req, res) => {
-    const { jobId, clusterId } = req.params;
-
-    database.collection("Jobs").updateOne(
-        { id: jobId },
-        { $pull: { clusters: { id: clusterId } } }
-    )
-        .then(result => {
-            if (result.modifiedCount > 0) {
-                res.json({ message: "Cluster deleted successfully" });
-            } else {
-                res.status(404).json({ error: "Job or Cluster not found" });
-            }
-        })
-        .catch(error => {
-            console.error("Error deleting cluster:", error);
-            res.status(500).json({ error: "Error deleting cluster" });
-        });
-});
-
-// New endpoint: Destroy Worker
-app.delete('/api/v1/DestroyWorker/:jobId/:clusterId/:workerId', (req, res) => {
-    const { jobId, clusterId, workerId } = req.params;
-
-    database.collection("Jobs").updateOne(
-        { id: jobId, "clusters.id": clusterId },
-        { $pull: { "clusters.$.workers": { id: workerId } } }
-    )
-        .then(result => {
-            if (result.modifiedCount > 0) {
-                res.json({ message: "Worker deleted successfully" });
-            } else {
-                res.status(404).json({ error: "Job, Cluster, or Worker not found" });
-            }
-        })
-        .catch(error => {
-            console.error("Error deleting worker:", error);
-            res.status(500).json({ error: "Error deleting worker" });
-        });
-});
-
-app.delete('/api/v1/DeleteMultipleContainers', async (req, res) => {
-    const { jobId, clusterId, containerIds } = req.body;
-
-    if (!jobId || clusterId== null || !Array.isArray(containerIds) || containerIds.length === 0) {
-        return res.status(400).json({ error: "Invalid data. Job ID, Cluster ID, and an array of container IDs are required." });
-    }
-
-    try {
-        // Check if the job and cluster exist
-        const job = await database.collection("Jobs").findOne({ id: jobId, "clusters.id": clusterId });
-
-        if (!job) {
-            return res.status(404).json({ error: "Job or Cluster not found" });
-        }
-
-        const cluster = job.clusters.find(c => c.id === clusterId);
-
-        if (!cluster) {
-            return res.status(404).json({ error: "Cluster not found in the specified job" });
-        }
-
-        // Prepare the update operation
-        const updateOperation = {
-            $pull: {
-                "clusters.$[cluster].containers": {
-                    id: { $in: containerIds }
-                }
-            }
-        };
-
-        // Perform the update
-        const result = await database.collection("Jobs").updateOne(
-            { id: jobId, "clusters.id": clusterId },
-            updateOperation,
-            {
-                arrayFilters: [{ "cluster.id": clusterId }]
-            }
-        );
-
-        if (result.modifiedCount === 0) {
-            return res.status(404).json({ error: "No containers were deleted. They may not exist in the specified cluster." });
-        }
-
-        // Remove the deleted containers from workers
-        await database.collection("Jobs").updateMany(
-            { id: jobId, "clusters.id": clusterId },
-            {
-                $pull: {
-                    "clusters.$[cluster].workers.$[].containers": {
-                        id: { $in: containerIds }
-                    }
-                }
-            },
-            {
-                arrayFilters: [{ "cluster.id": clusterId }]
-            }
-        );
-
-        res.json({
-            message: "Containers deleted successfully",
-            deletedCount: result.modifiedCount
-        });
-    } catch (error) {
-        console.error("Error deleting containers:", error);
-        res.status(500).json({ error: "Error deleting containers" });
-    }
-});
+// app.delete('/api/v1/DestroyJob/:jobId', (req, res) => {
+//     const jobId = req.params.jobId;
+//
+//     database.collection("Jobs").deleteOne({ id: jobId })
+//         .then(result => {
+//             if (result.deletedCount > 0) {
+//                 res.json({ message: "Job deleted successfully" });
+//             } else {
+//                 res.status(404).json({ error: "Job not found" });
+//             }
+//         })
+//         .catch(error => {
+//             console.error("Error deleting job:", error);
+//             res.status(500).json({ error: "Error deleting job" });
+//         });
+// });
+//
+// // New endpoint: Destroy Cluster
+// app.delete('/api/v1/DestroyCluster/:jobId/:clusterId', (req, res) => {
+//     const { jobId, clusterId } = req.params;
+//
+//     database.collection("Jobs").updateOne(
+//         { id: jobId },
+//         { $pull: { clusters: { id: clusterId } } }
+//     )
+//         .then(result => {
+//             if (result.modifiedCount > 0) {
+//                 res.json({ message: "Cluster deleted successfully" });
+//             } else {
+//                 res.status(404).json({ error: "Job or Cluster not found" });
+//             }
+//         })
+//         .catch(error => {
+//             console.error("Error deleting cluster:", error);
+//             res.status(500).json({ error: "Error deleting cluster" });
+//         });
+// });
+//
+// // New endpoint: Destroy Worker
+// app.delete('/api/v1/DestroyWorker/:jobId/:clusterId/:workerId', (req, res) => {
+//     const { jobId, clusterId, workerId } = req.params;
+//
+//     database.collection("Jobs").updateOne(
+//         { id: jobId, "clusters.id": clusterId },
+//         { $pull: { "clusters.$.workers": { id: workerId } } }
+//     )
+//         .then(result => {
+//             if (result.modifiedCount > 0) {
+//                 res.json({ message: "Worker deleted successfully" });
+//             } else {
+//                 res.status(404).json({ error: "Job, Cluster, or Worker not found" });
+//             }
+//         })
+//         .catch(error => {
+//             console.error("Error deleting worker:", error);
+//             res.status(500).json({ error: "Error deleting worker" });
+//         });
+// });
+//
+// app.delete('/api/v1/DeleteMultipleContainers', async (req, res) => {
+//     const { jobId, clusterId, containerIds } = req.body;
+//
+//     if (!jobId || clusterId== null || !Array.isArray(containerIds) || containerIds.length === 0) {
+//         return res.status(400).json({ error: "Invalid data. Job ID, Cluster ID, and an array of container IDs are required." });
+//     }
+//
+//     try {
+//         // Check if the job and cluster exist
+//         const job = await database.collection("Jobs").findOne({ id: jobId, "clusters.id": clusterId });
+//
+//         if (!job) {
+//             return res.status(404).json({ error: "Job or Cluster not found" });
+//         }
+//
+//         const cluster = job.clusters.find(c => c.id === clusterId);
+//
+//         if (!cluster) {
+//             return res.status(404).json({ error: "Cluster not found in the specified job" });
+//         }
+//
+//         // Prepare the update operation
+//         const updateOperation = {
+//             $pull: {
+//                 "clusters.$[cluster].containers": {
+//                     id: { $in: containerIds }
+//                 }
+//             }
+//         };
+//
+//         // Perform the update
+//         const result = await database.collection("Jobs").updateOne(
+//             { id: jobId, "clusters.id": clusterId },
+//             updateOperation,
+//             {
+//                 arrayFilters: [{ "cluster.id": clusterId }]
+//             }
+//         );
+//
+//         if (result.modifiedCount === 0) {
+//             return res.status(404).json({ error: "No containers were deleted. They may not exist in the specified cluster." });
+//         }
+//
+//         // Remove the deleted containers from workers
+//         await database.collection("Jobs").updateMany(
+//             { id: jobId, "clusters.id": clusterId },
+//             {
+//                 $pull: {
+//                     "clusters.$[cluster].workers.$[].containers": {
+//                         id: { $in: containerIds }
+//                     }
+//                 }
+//             },
+//             {
+//                 arrayFilters: [{ "cluster.id": clusterId }]
+//             }
+//         );
+//
+//         res.json({
+//             message: "Containers deleted successfully",
+//             deletedCount: result.modifiedCount
+//         });
+//     } catch (error) {
+//         console.error("Error deleting containers:", error);
+//         res.status(500).json({ error: "Error deleting containers" });
+//     }
+// });

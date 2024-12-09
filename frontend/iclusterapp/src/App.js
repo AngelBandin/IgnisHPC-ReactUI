@@ -9,6 +9,17 @@ const API_PORT = window._env_?.REACT_APP_HOST_PORT || '5038';
 const origin = window.location.origin;
 const baseUrl = origin.substring(0, origin.lastIndexOf(':'));
 const API_URL = process.env.REACT_APP_API_URL || `${baseUrl}:${API_PORT}/`;
+let jobclusters = {}
+let jobworkers = {}
+let jobdataframes = {}
+/*
+* jobs{
+*   jobname -> job-1{
+*       cluster-name -> cluster-route
+*    }
+*{
+*
+* */
 
 function App() {
 
@@ -18,7 +29,7 @@ function App() {
         document.title = "IgnisHPC Web UI";
         fetchData();
 
-        const intervalId = setInterval(fetchData, 10000); // Actualiza cada 10 segundos
+        const intervalId = setInterval(fetchData, 5000); // Actualiza cada 5 segundos
 
         return () => clearInterval(intervalId); // Limpia el intervalo cuando el componente se desmonta
     }, []);
@@ -93,7 +104,17 @@ function Breadcrumbs() {
     );
 }
 
+// Initialize these objects for each job
+function initializeJobObjects(jobs) {
+    jobs.forEach(job => {
+        if (!jobclusters[job.id]) jobclusters[job.id] = {};
+        if (!jobworkers[job.id]) jobworkers[job.id] = {};
+        if (!jobdataframes[job.id]) jobdataframes[job.id] = {};
+    });
+}
+
 function GenerateRoutes({jobs}) {
+    initializeJobObjects(jobs);
     return (
         <Routes>
             {jobs.length > 0 && <Route key="home" path="/" element={<JobView jobs={jobs}/>}/>}
@@ -106,33 +127,47 @@ function GenerateRoutes({jobs}) {
                             {cluster && <Route path={`/job-${job.id}/Cluster(${cluster.id})`} element={<ClusterDetailView cluster={cluster}/>}/>}
                             {(() => {
                                 const clusterpath = `/job-${job.id}/Cluster(${cluster.id})`;
+                                const clusterTaskname = cluster.taskgroup.tasks[0].name.replace(/.*<--\s*/, "");
+                                jobclusters[job.id][clusterTaskname] = `${clusterpath}/taskgroup`
                                 return (
                                     <>
                                         {cluster.containers && <Route path={`${clusterpath}/containers`} element={<ContainerClusterView cluster={cluster}/>} />}
                                         {cluster.properties && <Route path={`${clusterpath}/properties`} element={<PropertiesClusterView cluster={cluster}/>} />}
                                         {cluster.containers && cluster.containers.map((container) => (
                                             <React.Fragment key={`container-${container.id}`}>
-                                                {container && <Route path={`${clusterpath}/containers/Container-(${container.id})`} element={<ContainerDetailView container={container}/>}/>}
-                                                {container && <Route path={`${clusterpath}/containers/Container(${container.id})/properties`} element={<PropertiesContainerView container={container}/>}/>}
+                                                {container && <Route path={`${clusterpath}/containers/container-(${container.id})`} element={<ContainerDetailView container={container}/>}/>}
+                                                {container && <Route path={`${clusterpath}/containers/container-${container.id})/properties`} element={<PropertiesContainerView container={container}/>}/>}
                                             </React.Fragment>
                                         ))}
-                                        {cluster.taskgroup && TaskGroupRoutes(`${clusterpath}/taskgroup`, cluster.taskgroup)}
+                                        {cluster.taskgroup && TaskGroupRoutes(`${clusterpath}/taskgroup`, cluster.taskgroup, clusterpath)}
                                         {cluster.workers && <Route path={`${clusterpath}/workers`} element={<WorkersView cluster={cluster} />}/>}
-                                        {cluster.workers && cluster.workers.map((worker) => (
-                                            <React.Fragment key={`Worker(${worker.id})`}>
-                                                {worker && <Route path={`${clusterpath}/workers/Worker(${worker.id})`} element={<WorkerDetailView worker={worker}/>}/>}
-                                                {worker.containers && <Route path={`${clusterpath}/workers/Worker(${worker.id})/containers`} element={<ContainerWorkerView worker={worker}/>}/>}
-                                                {worker.dataframes && <Route path={`${clusterpath}/workers/Worker(${worker.id})/dataframes`} element={<DataframeWorkerView worker={worker}/>}/>}
+                                        {cluster.workers && cluster.workers.map((worker) => {
+                                            const workerpath = `${clusterpath}/workers/Worker(${worker.id})`;
+                                            const workerTaskname = worker.taskgroup.tasks[0].name.replace(/.*<--\s*/, "");
+                                            jobworkers[job.id][workerTaskname] = `${workerpath}/taskgroup`
+                                            return (
+                                                <React.Fragment key={`Worker(${worker.id})`}>
+                                                    {worker && <Route path={`${workerpath}`} element={<WorkerDetailView worker={worker}/>}/>}
+                                                    {worker.containers && <Route path={`${workerpath}/containers`} element={<ContainerWorkerView worker={worker}/>}/>}
+                                                    {worker.dataframes && <Route path={`${workerpath}/dataframes`} element={<DataframeWorkerView worker={worker}/>}/>}
 
-                                                {worker.dataframes && worker.dataframes.map((dataframe) => (
-                                                    <React.Fragment key={`Dataframe(${dataframe.id})`}>
-                                                        {dataframe && <Route path={`${clusterpath}/workers/Worker(${worker.id})/dataframes/Dataframe(${dataframe.id})`} element={<DataFrameDetailView dataframe={dataframe}/>}/>}
-                                                        {dataframe && dataframe.taskgroup && TaskGroupRoutes(`${clusterpath}/workers/Worker(${worker.id})/dataframes/Dataframe(${dataframe.id})/taskgroup`, dataframe.taskgroup)}
-                                                    </React.Fragment>
-                                                ))}
-                                                {worker && worker.taskgroup && TaskGroupRoutes(`${clusterpath}/workers/Worker(${worker.id})/taskgroup`, worker.taskgroup)}
-                                            </React.Fragment>
-                                        ))}
+                                                    {worker.dataframes && worker.dataframes.map((dataframe) => {
+                                                        const dataframepath = `${workerpath}/dataframes/Dataframe(${dataframe.id})`;
+                                                        const dataframeTaskname = dataframe.taskgroup.tasks[0].name.replace(/.*<--\s*/, "");
+                                                        jobdataframes[job.id][dataframeTaskname] = `${dataframepath}/taskgroup`
+                                                        return(<React.Fragment key={`Dataframe(${dataframe.id})`}>
+                                                            {dataframe && <Route
+                                                                path={`${dataframepath}`}
+                                                                element={<DataFrameDetailView
+                                                                    dataframe={dataframe}/>}/>}
+                                                            {dataframe && dataframe.taskgroup && TaskGroupRoutes(`${dataframepath}/taskgroup`, dataframe.taskgroup, job.id)}
+                                                        </React.Fragment>
+                                                        );
+                                                    })}
+                                                    {worker && worker.taskgroup && TaskGroupRoutes(`${workerpath}/taskgroup`, worker.taskgroup, job.id)}
+                                                </React.Fragment>
+                                            );
+                                        })}
                                     </>
                                 );
                             })()}
@@ -145,19 +180,19 @@ function GenerateRoutes({jobs}) {
     );
 }
 
-function TaskGroupRoutes( basePath,taskgroup) {
+function TaskGroupRoutes( basePath,taskgroup,jobid) {
     if (!taskgroup) {
         return null; // Terminate recursion if no dependencies
 
     }
     return (
         <>
-            <Route key = {`${basePath}`} path={`${basePath}`} element={<TaskView taskgroup={taskgroup} />}/>
+            <Route key = {`${basePath}`} path={`${basePath}`} element={<TaskView taskgroup={taskgroup} jobid={jobid} />}/>
             {taskgroup.dependencies &&  taskgroup.dependencies.length > 0 && taskgroup.dependencies.map((dependency, index) => (
-                TaskGroupRoutes(`${basePath}/dependencies/taskgroup-${index}`,dependency)
+                TaskGroupRoutes(`${basePath}/dependencies/taskgroup-${index}`,dependency, jobid)
             ))}
             {taskgroup.subTasksGroup &&  taskgroup.subTasksGroup.length > 0 && taskgroup.subTasksGroup.map((dependency, index) => (
-                TaskGroupRoutes(`${basePath}/subtasksgroup/taskgroup-${index}`,dependency)
+                TaskGroupRoutes(`${basePath}/subtasksgroup/taskgroup-${index}`,dependency, jobid)
             ))}
         </>
     );
@@ -481,7 +516,7 @@ function WorkerDetailView({worker}) {
         </div>)
 }
 
-function TaskView({taskgroup}) {
+function TaskView({taskgroup, jobid}) {
     const location = useLocation();
     const currentPath = location.pathname;
     if (!taskgroup) {
@@ -489,7 +524,7 @@ function TaskView({taskgroup}) {
     }
     return (
         <div className="body">
-            <h3 className="cluster-name">Taskgroup: </h3>
+            <h3 className="cluster-name">Taskgroup:</h3>
             <div className="cluster-container">
                 <Table striped>
                     <thead>
@@ -512,13 +547,36 @@ function TaskView({taskgroup}) {
                     </tr>
                     </thead>
                     <tbody>
-                    {taskgroup.dependencies && taskgroup.dependencies.map((dependency, index) => (
-                        <tr key={index}>
-                            <td>
-                                <Link to={`${currentPath}/dependencies/taskgroup-${index}`}>{dependency.tasks[0].name.replace(/.*<--\s*/, "")}</Link>
-                            </td>
-                        </tr>
-                    ))}
+                    {taskgroup.dependencies &&
+                        taskgroup.dependencies.map((dependency, index) => {
+                            let linkPath;
+                            let dependencyName;
+                            switch (dependency.class) {
+                                case "Cluster":
+                                    linkPath = jobclusters[jobid][dependency.parent];
+                                    dependencyName = dependency.parent;
+                                    break;
+                                case "Worker":
+                                    linkPath = jobworkers[jobid][dependency.parent];
+                                    dependencyName = dependency.parent;
+                                    break;
+                                case "Dataframe":
+                                    linkPath = jobdataframes[jobid][dependency.parent];
+                                    dependencyName = dependency.parent;
+                                    break;
+                                default:
+                                    linkPath = `${currentPath}/dependencies/taskgroup-${index}`;
+                                    dependencyName = dependency.tasks[0].name.replace(/.*<--\s*/, "");
+
+                            }
+                            return (
+                                <tr key={index}>
+                                    <td>
+                                        <Link to={linkPath}>{dependencyName}</Link>
+                                    </td>
+                                </tr>
+                            );
+                        })}
                     </tbody>
                 </Table>
                 <Table striped>
@@ -670,11 +728,7 @@ function ContainerView({containers}) {
                         {containers.map(container => (
                             <tr key={container.id}>
                                 <td>{container.id}</td>
-                                <td className="styled-link">
-                                    <Link
-                                        to={`${pathtocluster}`}>Cluster</Link>
-                                </td>
-                                {container.clusterId? (<td key={container.clusterId} className="styled-link">
+                                {(container.clusterId || container.clusterId === 0) && container.clusterId !== -1 ? (<td key={container.clusterId} className="styled-link">
                                     <Link
                                         to={`${pathtocluster}`}>Cluster</Link>
                                 </td>) : <td>N/A</td>}
@@ -1054,7 +1108,7 @@ function DataFramesView({dataframes, detail = false}) {
                             <td key={dataframe.id} className="styled-link"><Link
                                 to={`${pathtoworker}/containers`}>containers</Link></td>
                             <td key={dataframe.id} className="styled-link"><Link
-                                to={`${currentPath}/Dataframe-(${dataframe.id})/taskgroup`}>taskgroup</Link></td>
+                                to={`${currentPath}/Dataframe(${dataframe.id})/taskgroup`}>taskgroup</Link></td>
                         </tr>
                     ))}
                     </tbody>
