@@ -117,11 +117,12 @@ function GenerateRoutes({jobs}) {
     initializeJobObjects(jobs);
     return (
         <Routes>
-            {jobs.length > 0 && <Route key="home" path="/" element={<JobView jobs={jobs}/>}/>}
+            {jobs.length > 0 && <Route key="home" path="/" element={<JobsView jobs={jobs}/>}/>}
             {jobs && jobs.map((job) => (
                 <React.Fragment key={`job-${job.id}`}>
-                    {job && <Route path={`/job-${job.id}`} element={<JobDetailView job={job}/>}/>}
+                    {job && <Route path={`/job-${job.id}`} element={<ClustersView job={job}/>}/>}
                     {job && <Route path={`/job-${job.id}/driver`} element={<JobDriverView job={job}/>}/>}
+                    {job && job.driver && <Route path={`/job-${job.id}/driver/properties`} element={<PropertiesContainerView container={job.driver}/>}/>}
                     {job.clusters && job.clusters.map((cluster) => (
                         <React.Fragment key={`Cluster(${cluster.id})`}>
                             {cluster && <Route path={`/job-${job.id}/Cluster(${cluster.id})`} element={<ClusterDetailView cluster={cluster}/>}/>}
@@ -135,8 +136,8 @@ function GenerateRoutes({jobs}) {
                                         {cluster.properties && <Route path={`${clusterpath}/properties`} element={<PropertiesClusterView cluster={cluster}/>} />}
                                         {cluster.containers && cluster.containers.map((container) => (
                                             <React.Fragment key={`container-${container.id}`}>
-                                                {container && <Route path={`${clusterpath}/containers/container-(${container.id})`} element={<ContainerDetailView container={container}/>}/>}
-                                                {container && <Route path={`${clusterpath}/containers/container-${container.id})/properties`} element={<PropertiesContainerView container={container}/>}/>}
+                                                {container && <Route path={`${clusterpath}/containers/container-${container.id}`} element={<ContainerDetailView container={container}/>}/>}
+                                                {container && <Route path={`${clusterpath}/containers/container-${container.id}/properties`} element={<PropertiesContainerView container={container}/>}/>}
                                             </React.Fragment>
                                         ))}
                                         {cluster.taskgroup && TaskGroupRoutes(`${clusterpath}/taskgroup`, cluster.taskgroup, clusterpath)}
@@ -208,7 +209,7 @@ function NotFound() {
     );
 }
 
-function JobView({jobs}) {
+function JobsView({jobs}) {
 
     return (
         <div className="body">
@@ -228,7 +229,6 @@ function JobView({jobs}) {
                         </thead>
                         <tbody>
                         {jobs.map(job => (
-
                             <tr key={job.id}>
                                 <td className="styled-link"><Link
                                     to={`/job-${job.id}`}>{job.name}</Link></td>
@@ -247,7 +247,7 @@ function JobView({jobs}) {
     )
 }
 
-function JobDetailView({job}) {
+function ClustersView({job}) {
     if (!job) {
         return <div>Este trabajo ya no existe. <Link to="/">Volver a la página principal</Link></div>;
     }
@@ -333,6 +333,7 @@ function JobDriverView({job}) {
                     <th>Driver</th>
                     <th>Directory</th>
                     <th>Worker</th>
+                    <th>Status</th>
                 </tr>
                 </thead>
                 <tbody>
@@ -344,6 +345,7 @@ function JobDriverView({job}) {
                         to={`/job-${job.id}/driver`}>driver</Link></td>
                     <td>{job.directory || "N/A"}</td>
                     <td>{job.worker || "N/A"}</td>
+                    <td>{job.status || "Finished"}</td>
                 </tr>
                 </tbody>
             </Table>
@@ -728,18 +730,28 @@ function ContainerView({containers}) {
                         {containers.map(container => (
                             <tr key={container.id}>
                                 <td>{container.id}</td>
-                                {(container.clusterId || container.clusterId === 0) && container.clusterId !== -1 ? (<td key={container.clusterId} className="styled-link">
+                                {(container.cluster || container.cluster === 0) && container.cluster !== -1 ? (<td key={container.cluster} className="styled-link">
                                     <Link
                                         to={`${pathtocluster}`}>Cluster</Link>
                                 </td>) : <td>N/A</td>}
                                 <td>{container.infoid || 'N/A'}</td>
                                 <td className="styled-link">
-                                    <Link
-                                        to={`${pathtocluster}/containers/container-${container.id}/properties`}>properties</Link>
+                                    {container.cluster !== -1 ? (
+                                        <Link to={`${pathtocluster}/containers/container-${container.id}/properties`}>properties</Link>) : (
+                                        <Link to={`${pathtocluster}/properties`}>properties</Link>
+                                    )}
                                 </td>
                                 <td>{container.host || 'N/A'}</td>
                                 <td>{container.cpus || 'N/A'}</td>
-                                <td>{container.memory || 'N/A'}</td>
+                                <td>
+                                    {container.memory
+                                        ? container.memory < 1000000
+                                            ? `${container.memory} B`
+                                            : container.memory < 1000000000
+                                                ? `${(container.memory / 1000000)} MB`
+                                                : `${(container.memory / 1000000000)} GB`
+                                        : 'N/A'}
+                                </td>
                                 <td><PortList ports={container.ports}/></td>
 
                                 {showAllColumns && (

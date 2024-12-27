@@ -141,7 +141,7 @@ app.post('/api/v1/UpsertCluster', (req, res) => {
     database.collection("Jobs").findOne({ id: jobId })
         .then(job => {
             if (!job) {
-                return res.status(404).json({ error: "Job not found" });
+                return res.status(404).json({ error: "Job not found." });
             }
 
             const existingClusterIndex = job.clusters.findIndex(c => c.id === cluster.id);
@@ -200,7 +200,7 @@ app.post('/api/v1/UpsertWorker', (req, res) => {
     database.collection("Jobs").findOne({ id: jobId })
         .then(job => {
             if (!job) {
-                return res.status(404).json({ error: "Job not found" });
+                return res.status(404).json({ error: "Job not found." });
             }
 
             console.log('Found job:', JSON.stringify(job, null, 2));
@@ -328,10 +328,11 @@ app.post('/api/v1/UpsertMultipleContainers', async (req, res) => {
 
     try {
         // Check if the job and cluster exist
-        const job = await database.collection("Jobs").findOne({ id: jobId, "clusters.id": clusterId });
+
+        const job = await database.collection("Jobs").findOne({ id: jobId });
 
         if (!job) {
-            return res.status(404).json({ error: "Job or Cluster not found" });
+            return res.status(404).json({ error: "Job not found" });
         }
 
         const cluster = job.clusters.find(c => c.id === clusterId);
