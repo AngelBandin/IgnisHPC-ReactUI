@@ -123,7 +123,10 @@
 .table-container table {
   min-width: 100%;
 }
-
+.table-container.show-all-columns {
+  white-space: nowrap; /* Prevent table content from wrapping */
+  overflow-x: scroll; /* Always show a scrollbar */
+}
 
 .env-vars {
   max-height: 100px;

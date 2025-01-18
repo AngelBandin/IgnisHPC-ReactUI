@@ -237,7 +237,7 @@ function JobsView({jobs}) {
                                     to={`/job-${job.id}/driver`}>driver</Link></td>
                                 <td>{job.directory || "N/A"}</td>
                                 <td>{job.worker || "N/A"}</td>
-                                <td>{job.status|| "Finished"}</td>
+                                <td>{job.status|| "Unknown"}</td>
                             </tr>
                         ))}
                         </tbody>
@@ -460,8 +460,8 @@ function WorkersView({cluster}) {
                         <tr key={worker.id}>
                             <td>{worker.name}</td>
                             <td>{worker.id}</td>
-                            <td>{worker.type}</td>
-                            <td>{worker.cores}</td>
+                            <td>{worker.type || "N/A"}</td>
+                            <td>{worker.cores ?? "N/A"}</td>
                             <td key={worker.id} className="styled-link"><Link
                                 to={`${currentPath}/Worker(${worker.id})/taskgroup`}>taskgroup</Link></td>
                             <td key={worker.id} className="styled-link"><Link
@@ -502,8 +502,8 @@ function WorkerDetailView({worker}) {
                         <tr key={worker.id}>
                             <td>{worker.name}</td>
                             <td>{worker.id}</td>
-                            <td>{worker.type}</td>
-                            <td>{worker.cores}</td>
+                            <td>{worker.type ?? "N/A"}</td>
+                            <td>{worker.cores ?? "N/A"}</td>
                             <td key={worker.id} className="styled-link"><Link
                                 to={`${currentPath}/taskgroup`}>taskgroup</Link></td>
                             <td key={worker.id} className="styled-link"><Link
@@ -678,8 +678,8 @@ function ContainerWorkerView({worker}) {
                 <tr key={worker.id}>
                     <td>{worker.name}</td>
                     <td>{worker.id}</td>
-                    <td>{worker.type}</td>
-                    <td>{worker.cores}</td>
+                    <td>{worker.type ?? "N/A"}</td>
+                    <td>{worker.cores ?? "N/A"}</td>
                     <td key={worker.id} className="styled-link"><Link
                         to={`${pathtoworker}/taskgroup`}>taskgroup</Link></td>
                     <td key={worker.id} className="styled-link"><Link
@@ -767,13 +767,13 @@ function ContainerView({containers}) {
                                         ) : (
                                             "No arguments"
                                         )}</td>
-                                        <td>{container.swappiness}</td>
+                                        <td>{container.swappiness ?? 'N/A'}</td>
                                         <td>{container.networkMode || 'N/A'}</td>
                                         <td><BindList binds={container.binds}/></td>
                                         <td><VolumeList volumes={container.volumes}/></td>
-                                        <td>{container.preferedhosts && container.preferedhosts.length > 0 ? (
+                                        <td>{container.preferedHosts && container.preferedHosts.length > 0 ? (
                                             <ul>
-                                                {container.preferedhosts.map((preferedhost, index) => (
+                                                {container.preferedHosts.map((preferedhost, index) => (
                                                     <li key={index}>{preferedhost}</li>
                                                 ))}
                                             </ul>
@@ -793,7 +793,7 @@ function ContainerView({containers}) {
                                                            string="Environment Variables"/></td>
                                         <td><StringMapView variables={container.schedulerParams}
                                                            string="Scheduler Params"/></td>
-                                        <td>{container.resets}</td>
+                                        <td>{container.resets ?? 'N/A'}</td>
                                     </>
                                 )}
                             </tr>
@@ -1060,8 +1060,8 @@ function DataframeWorkerView({worker}) {
                 <tr key={worker.id}>
                     <td>{worker.name}</td>
                     <td>{worker.id}</td>
-                    <td>{worker.type}</td>
-                    <td>{worker.cores}</td>
+                    <td>{worker.type ?? "N/A"}</td>
+                    <td>{worker.cores ?? "N/A"}</td>
                     <td key={worker.id} className="styled-link"><Link
                         to={`${pathtoworker}/taskgroup`}>taskgroup</Link></td>
                     <td key={worker.id} className="styled-link"><Link
